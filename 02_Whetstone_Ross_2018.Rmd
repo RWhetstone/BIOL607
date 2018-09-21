@@ -1,0 +1,149 @@
+---
+title: "02_Whetstone_Ross_2018.Rmd"
+author: "Ross Whetstone"
+date: "09/12/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = FALSE)
+library(dplyr)
+```
+
+### 1. R Warmup 
+```{r my_vec, eval=FALSE}
+my_vec <- runif(n = 100, min = 0, max = 100)
+str(my_vec) 
+summary(my_vec)
+```
+**1a.** 
+- `str(my_vec)` shows that the vector contains 100 values of random numbers.
+- `summary(my_vec)` tells us more about the vector's distribution.  It returns the highest and lowest values, the median, mean, and 1st and 3rd quartiles.  Neither returns the entire contents of the vector. 
+
+```{r hist_my_vec, eval=FALSE}
+hist(my_vec)
+?hist
+```
+**1b.** 
+- `hist(my_vec)` displays a histogram of `my_vec`.  Random numbers are broken into groups of 10 by default.  The helpfile shows the additional arguments available to use with the `hist` function.
+
+**1c.**
+```{r echo=FALSE, eval=FALSE}
+data(mtcars) 
+class(mtcars)
+str(mtcars) 
+summary(mtcars)
+?data.frame
+```
+- `class(mtcars)` shows mtcars is a data frame
+- `str(mtcars)` shows mtcars is a data frame with 11 variables and 32 observations for each variable. Lists the names of the columns, the class of data within each group (numeric), and shows the first 10 values in each group.
+- `summary(mtcars)` returns the following values for each variable: minimum and maximum values, mean, median, 1st and 3rd quartiles
+
+**1d.**
+- `?data.frame` Helpfile lists the properties of data.frames.  Essentially they are a special type of list that arranges data in a table. The number of   Helpfile describes the arguments available to use in the function.
+
+
+### 2. Sample Properties 
+
+**2a.** Say “Vole vasopressin” 10 times as fast as you can. How many times did you trip up?
+**3 times**
+
+```{r voles}
+vole_vaso <- c(98,96,94,88,86,77,74,70,60,59,52,50,47,40,35,29,13,6,5)
+```
+```{r voles_analysis, eval=FALSE}
+summary(vole_vaso)
+sd(vole_vaso)
+IQR(vole_vaso)
+length(vole_vaso)
+```
+**2b.** 
+
+* `Mean    = 56.79`
+
+* `Median  = 59.00`
+
+* `SD      = 30.01403`
+
+* `IQR     = 44`
+
+**2c.**
+Standard Error of the Mean = sd/sqrt(n)
+```{r SEM}
+SEM <- (sd(vole_vaso)/sqrt(length(vole_vaso)))
+SEM 
+```
+**Standard error of the mean = 6.885691**
+
+**2d.** What does the standard error of the mean tell you about our estimate of the mean values of the population of vole vassopressin?
+
+**A SE of 6.89 suggests that we can expect an estimate of the mean of the population to have a value within 6.89 units of the sample mean 56.79.**
+
+###3. Sample Size for upper quartiles
+```{r Quantiles}
+quantile(vole_vaso, probs = 0.75)
+```
+**3a.** Use `sample()` to get just one resample with a sample size of 10.  What is its upper quartile?
+
+```{r Resample_Vole_vaso}
+#Draws 10 from vole_vaso, then returns the upper quartile from that sub-sample
+set.seed(2018) #Sets the seed to get the same result for the quantile
+vole_vaso_samp <- sample(vole_vaso, size = 10, replace = TRUE)
+quantile(vole_vaso_samp, probs = 0.75)
+
+```
+**Upper quartile = 85.25**
+
+**3b.** Build an initial data frame for simulations with the sample sizes 5 through 20. Have 100 simulations per sample size.
+```{r vole_vaso_sim}
+vole_sim <- data.frame(
+  samp_size = rep(5:20, time = 100)) 
+vole_sim$num_sims <- 1:nrow(vole_sim) #Draws from sample sizes 5-20, repeats 100 times, adds column for the corresponding simulation number
+```
+
+**3c. & 3d.** Use this data frame to get simulated upper quartiles for each sample size.
+
+``` {r sim_upper_quartiles}
+vole_sim <- vole_sim %>%
+  group_by(num_sims) %>%
+  mutate(uq_sim = quantile(sample(vole_vaso, samp_size, replace=TRUE), probs = 0.75))
+
+plot(uq_sim ~ samp_size, data = vole_sim)
+```
+
+
+**I think a sample size of 11 or 12 should be adequate.**
+
+###4. SE and CI 
+**4a.**
+``` {r UQ_SE_CI}
+vole_sim_stats <- vole_sim %>%
+  group_by(samp_size) %>%
+  summarize(vole_uq_SE = sd(uq_sim))
+```
+**4b.**
+**The standard error of the upper quartile means that for each sample size from 5-20, we can expect the value of the upper quartile to be the corresponding value found in uq_sim +/- vole_uq_SE. As sample size increases, vole_uq_SE decreases, suggesting that as sample size inreases, the precision of our estimate for the upper quartile increases.**
+
+**4c.**
+```{r more_vole_stats}
+vole_sim_stats2 <- vole_sim %>%
+ group_by(samp_size == 10) %>%
+  summarize(vole_uq_CI = 1.96*sd(uq_sim)) #There's gotta be a better way..
+vole_sim_stats2$vole_uq_CI[2]
+```
+**CI = 23.32.  This means in simulations with sample sizes of 10, we can expect the upper quartile value to be contained within that interval 95% of the time**  
+
+**4d.** Extra credit: Instead of having each sim calculate a upper quartile, and then sifting down to the SE of that upper quartile (or the CI), have each simulation calculate a CI. Then, for just a sample size of 10, how many CI’s contain the true value of 83?
+
+####
+```{r vole_ci, eval=FALSE}
+vole_sim2 <- data.frame(
+  samp_size = rep(5:20, time = 100)) 
+vole_sim2$num_sims <- 1:nrow(vole_sim2) #make a new data.frame with column for number of simulations
+
+vole_sim2 <- vole_sim2 %>%
+ group_by(samp_size) %>%
+  summarize(vole_CI = sd(vole_sim2$samp_size)/rt(nrow(num_sims))) #tried to calculate CI by calculating 1.96*SD.  Got lost
+```
+####
